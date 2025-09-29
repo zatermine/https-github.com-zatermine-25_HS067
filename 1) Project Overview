@@ -63,9 +63,3 @@ H/W 기능 : 아두이노(ESP8266) Wi-Fi 연결, DHT11 온습도 측정, 릴레�
 아두이노 및 GPIO 제어 : HTTP 명령 수신, GPIO 핀 제어, 서보모터 각도 조절, 릴레이 ON/OFF, 온습도 센서 데이터 수집
 음성 피드백 (TTS) : 명령 결과 음성 출력, 간단한 TTS 모듈, 자연스러운 음성, 고도화 가능성
 하드웨어 제어 기술 : MCU(Arduino, ESP8266), Wi-Fi/Bluetooth 통신, 릴레이/IR 송신기 제어, 온도·조도 센서 환경 모니터링
-
-2. 팀원 소개
-<img width="843" height="500" alt="image" src="https://github.com/user-attachments/assets/2141c661-cf6f-4322-98d9-9382bb428792" />
-
-
-
