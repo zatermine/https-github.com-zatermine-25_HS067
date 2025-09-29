@@ -63,6 +63,7 @@ H/W 기능 : 아두이노(ESP8266) Wi-Fi 연결, DHT11 온습도 측정, 릴레�
 하드웨어 제어 기술 : MCU(Arduino, ESP8266), Wi-Fi/Bluetooth 통신, 릴레이/IR 송신기 제어, 온도·조도 센서 환경 모니터링
 
 2. 팀원 소개
+<img width="843" height="500" alt="image" src="https://github.com/user-attachments/assets/2141c661-cf6f-4322-98d9-9382bb428792" />
 
 
 
