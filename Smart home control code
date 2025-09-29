@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- 아이콘 설정 -->
+<link rel="website icon" href="./icons/icon.png" type="png">
+
+  <title>음성제어 스마트홈제어 시스템</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+    
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 1rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      backdrop-filter: blur(10px);
+    }
+    
+    h2 {
+      color: #2c3e50;
+      font-weight: 700;
+      margin-bottom: 2rem;
+      font-size: 1.8rem;
+    }
+    
+    .control-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    
+    .device-group {
+      background: #f8f9fa;
+      border-radius: 15px;
+      padding: 1.5rem;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    }
+    
+    .device-title {
+      font-weight: 500;
+      color: #495057;
+      margin-bottom: 1rem;
+      font-size: 1.1rem;
+      text-align: center;
+    }
+    
+    .device-buttons {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      font-weight: 500;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      flex: 1;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .btn-on {
+      background: linear-gradient(45deg, #28a745, #20c997);
+      color: white;
+    }
+    
+    .btn-off {
+      background: linear-gradient(45deg, #dc3545, #fd7e14);
+      color: white;
+    }
+    
+    .btn-voice {
+      background: linear-gradient(45deg, #007bff, #6f42c1);
+      color: white;
+      grid-column: 1 / -1;
+      margin-top: 1rem;
+    }
+    
+    .btn-clear {
+      background: linear-gradient(45deg, #6c757d, #495057);
+      color: white;
+      grid-column: 1 / -1;
+    }
+    
+    #log {
+      font-size: 0.9rem;
+      max-height: 300px;
+      overflow-y: auto;
+      background: #2c3e50;
+      color: #ecf0f1;
+      border-radius: 15px;
+      padding: 1.5rem;
+      border: none;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+      font-family: 'Courier New', monospace;
+      line-height: 1.4;
+    }
+    
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    
+    .status-online {
+      background: #28a745;
+      box-shadow: 0 0 6px #28a745;
+    }
+    
+    .status-offline {
+      background: #dc3545;
+    }
+    
+    @media (max-width: 576px) {
+      .control-section {
+        grid-template-columns: 1fr;
+      }
+      
+      .container {
+        padding: 1rem;
+        margin: 10px;
+        border-radius: 15px;
+      }
+      
+      h2 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="text-center">
+      <span class="status-indicator status-online" id="connectionStatus"></span>
+      <h2>🏠 스마트 홈 제어 시스템</h2>
+      <p style="color: #6c757d; margin-bottom: 1rem;">음성 명령이나 버튼으로 집안의 기기들을 제어해보세요</p>
+      
+      <div class="arduino-code-section" style="margin-bottom: 2rem;">
+        <label style="display: flex; align-items: center; justify-content: center; color: #495057; cursor: pointer;">
+          <input type="checkbox" id="showArduinoCode" onchange="toggleArduinoCode()" style="margin-right: 8px;">
+          <span>📱 아두이노 코드 보기</span>
+        </label>
+        <div id="arduinoCodeContainer" style="display: none; margin-top: 1rem;">
+          <div style="position: relative;">
+            <button onclick="copyArduinoCode()" style="position: absolute; top: 10px; right: 10px; background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 5px; font-size: 0.8rem; z-index: 10;">복사</button>
+            <textarea id="arduinoCode" readonly style="width: 100%; height: 400px; font-family: 'Courier New', monospace; font-size: 0.8rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 15px; resize: vertical;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="smarthome-code-section" style="margin-bottom: 2rem;">
+        <label style="display: flex; align-items: center; justify-content: center; color: #495057; cursor: pointer;">
+          <input type="checkbox" id="showSmartHomeCode" onchange="toggleSmartHomeCode()" style="margin-right: 8px;">
+          <span>🏠 스마트홈 제어코드 보기</span>
+        </label>
+        <div id="smartHomeCodeContainer" style="display: none; margin-top: 1rem;">
+          <div style="position: relative;">
+            <button onclick="copySmartHomeCode()" style="position: absolute; top: 10px; right: 10px; background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 5px; font-size: 0.8rem; z-index: 10;">복사</button>
+            <textarea id="smartHomeCode" readonly style="width: 100%; height: 400px; font-family: 'Courier New', monospace; font-size: 0.8rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 15px; resize: vertical;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="monitor-code-section" style="margin-bottom: 2rem;">
+        <label style="display: flex; align-items: center; justify-content: center; color: #495057; cursor: pointer;">
+          <input type="checkbox" id="showMonitorCode" onchange="toggleMonitorCode()" style="margin-right: 8px;">
+          <span>📊 모니터링 대시보드 코드보기</span>
+        </label>
+        <div id="monitorCodeContainer" style="display: none; margin-top: 1rem;">
+          <div style="position: relative;">
+            <button onclick="copyMonitorCode()" style="position: absolute; top: 10px; right: 10px; background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 5px; font-size: 0.8rem; z-index: 10;">복사</button>
+            <textarea id="monitorCode" readonly style="width: 100%; height: 400px; font-family: 'Courier New', monospace; font-size: 0.8rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 15px; resize: vertical;"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="control-section">
+      <div class="device-group">
+        <div class="device-title">💡 조명 제어</div>
+        <div class="device-buttons">
+          <button class="btn-on" onclick="sendText('ON')">켜기</button>
+          <button class="btn-off" onclick="sendText('OFF')">끄기</button>
+        </div>
+        <small style="color: #6c757d; text-align: center; display: block; margin-top: 0.5rem;">"조명켜" 또는 "조명꺼"</small>
+      </div>
+      
+      <div class="device-group">
+        <div class="device-title">🌪️ 환풍기 제어</div>
+        <div class="device-buttons">
+          <button class="btn-on" onclick="sendText('PAN_ON')">켜기</button>
+          <button class="btn-off" onclick="sendText('PAN_OFF')">끄기</button>
+        </div>
+        <small style="color: #6c757d; text-align: center; display: block; margin-top: 0.5rem;">"팬켜" 또는 "팬꺼"</small>
+      </div>
+      
+      <div class="device-group">
+        <div class="device-title">🚪 도어 제어</div>
+        <div class="device-buttons">
+          <button class="btn-on" onclick="sendText('DOOR_ON')">열기</button>
+          <button class="btn-off" onclick="sendText('DOOR_OFF')">닫기</button>
+        </div>
+        <small style="color: #6c757d; text-align: center; display: block; margin-top: 0.5rem;">"문열어" 또는 "문닫아"</small>
+      </div>
+      
+      <div class="device-group">
+        <div class="device-title">🌡️ 온도</div>
+        <div style="text-align: center; color: #495057; font-size: 1.5rem; font-weight: bold;" id="temperature">--°C</div>
+      </div>
+      
+      <div class="device-group">
+        <div class="device-title">💧 습도</div>
+        <div style="text-align: center; color: #495057; font-size: 1.5rem; font-weight: bold;" id="humidity">--%</div>
+      </div>
+    </div>
+    
+    <div class="control-section">
+      <button class="btn-voice" onclick="startVoiceRecognition()">🎤 음성으로 제어하기</button>
+      <button class="btn-clear" onclick="clearLog()">📋 메시지 기록 지우기</button>
+      <button class="btn-voice" onclick="window.open('monitor.html', '_blank')" style="background: linear-gradient(45deg, #17a2b8, #6610f2);">📊 모니터링 데시보드</button>
+    </div>
+    
+    <div>
+      <h5 style="color: #495057; margin-bottom: 1rem;">📊 시스템 로그</h5>
+      <pre id="log"></pre>
+    </div>
+  </div>
+
+  <script>
+    const log = (msg) => {
+      const now = new Date().toLocaleTimeString('ko-KR');
+      document.getElementById('log').textContent += `[${now}] ${msg}\n`;
+      document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+    };
+
+    const getDeviceName = (command) => {
+      if (command.includes('PAN')) return '환풍기';
+      if (command.includes('DOOR')) return '도어';
+      return '조명';
+    };
+
+    const arduinoCodeText = `#include <WiFiS3.h>
+#include <PubSubClient.h>
+#include <DHT.h>
+
+// 핀 설정
+#define RELAY_PIN 2
+#define PAN_PIN 4
+#define DOOR_PIN 9
+#define DHTPIN 10
+#define DHTTYPE DHT11
+
+#include <Servo.h>
+Servo myservo;
+
+DHT dht(DHTPIN, DHTTYPE);
+
+// Wi-Fi 정보
+const char* ssid = "SmartCenter 2.4G";
+const char* password = "12345678";
+
+// MQTT 브로커 정보
+const char* mqtt_server = "pubcode2.iptime.org";
+const int mqtt_port = 31883;
+const char* mqtt_topic_sub = "b03_test";
+const char* mqtt_topic_pub = "b03_sensor"; // 센서 데이터 전송용 토픽
+
+WiFiClient wifiClient;
+PubSubClient client(wifiClient);
+
+// 와이파이 연결
+void setup_wifi() {
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\\nWiFi connected");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
+// MQTT 메시지 수신 콜백
+void callback(char* topic, byte* payload, unsigned int length) {
+  String message;
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+
+  Serial.print("Message received: ");
+  Serial.println(message);
+
+  if (message == "OFF") {
+    digitalWrite(RELAY_PIN, HIGH);
+    Serial.println("Relay ON");
+  } else if (message == "ON") {
+    digitalWrite(RELAY_PIN, LOW);
+    Serial.println("Relay OFF");
+  }
+  if (message == "PAN_OFF") {
+    digitalWrite(PAN_PIN, HIGH);
+    Serial.println("Relay Pan ON");
+  } else if (message == "PAN_ON") {
+    digitalWrite(PAN_PIN, LOW);
+    Serial.println("Relay Pan OFF");
+  }  
+  if (message == "DOOR_OFF") {
+    myservo.write(120);
+    Serial.println("DOOR CLOSE");
+  } else if (message == "DOOR_ON") {
+    myservo.write(0);
+    Serial.println("DOOR OPEN");
+  }
+}
+
+// MQTT 재연결
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    if (client.connect("arduinoClient")) {
+      Serial.println("connected");
+      client.subscribe(mqtt_topic_sub);
+      Serial.println("Subscribed to topic: b03_test");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" retrying in 5 seconds...");
+      delay(5000);
+    }
+  }
+}
+
+unsigned long lastPublish = 0;
+const unsigned long publishInterval = 5000; // 5초마다 전송
+
+void setup() {
+  Serial.begin(9600);
+  myservo.attach(DOOR_PIN);
+  myservo.write(0);  // 초기 위치
+
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH);  // 초기 릴레이 OFF
+  pinMode(PAN_PIN, OUTPUT);
+  digitalWrite(PAN_PIN, HIGH);    // 초기 릴레이 OFF
+
+  dht.begin();
+  setup_wifi();
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
+  // 주기적 온습도 측정 및 MQTT 전송
+  unsigned long now = millis();
+  if (now - lastPublish > publishInterval) {
+    lastPublish = now;
+
+    float h = dht.readHumidity();
+    float t = dht.readTemperature();
+
+    if (isnan(h) || isnan(t)) {
+      Serial.println("Failed to read from DHT sensor!");
+      return;
+    }
+
+    // JSON 형식 메시지 전송
+    String payload = "{";
+    payload += "\\"temperature\\":" + String(t, 1) + ",";
+    payload += "\\"humidity\\":" + String(h, 1);
+    payload += "}";
+
+    Serial.print("Publishing: ");
+    Serial.println(payload);
+    client.publish(mqtt_topic_pub, payload.c_str());
+  }
+}`;
+
+    const toggleArduinoCode = () => {
+      const checkbox = document.getElementById('showArduinoCode');
+      const container = document.getElementById('arduinoCodeContainer');
+      const codeTextarea = document.getElementById('arduinoCode');
+      
+      if (checkbox.checked) {
+        container.style.display = 'block';
+        codeTextarea.value = arduinoCodeText;
+      } else {
+        container.style.display = 'none';
+      }
+    };
+
+    const copyArduinoCode = () => {
+      const codeTextarea = document.getElementById('arduinoCode');
+      codeTextarea.select();
+      document.execCommand('copy');
+      
+      const button = event.target;
+      const originalText = button.textContent;
+      button.textContent = '복사됨!';
+      button.style.background = '#28a745';
+      
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.style.background = '#007bff';
+      }, 2000);
+    };
+
+    const toggleSmartHomeCode = async () => {
+      const checkbox = document.getElementById('showSmartHomeCode');
+      const container = document.getElementById('smartHomeCodeContainer');
+      const codeTextarea = document.getElementById('smartHomeCode');
+      
+      if (checkbox.checked) {
+        container.style.display = 'block';
+        try {
+          const response = await fetch('index.html');
+          const htmlContent = await response.text();
+          codeTextarea.value = htmlContent;
+        } catch (error) {
+          codeTextarea.value = 'Error loading file: ' + error.message;
+        }
+      } else {
+        container.style.display = 'none';
+      }
+    };
+
+    const copySmartHomeCode = () => {
+      const codeTextarea = document.getElementById('smartHomeCode');
+      codeTextarea.select();
+      document.execCommand('copy');
+      
+      const button = event.target;
+      const originalText = button.textContent;
+      button.textContent = '복사됨!';
+      button.style.background = '#28a745';
+      
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.style.background = '#007bff';
+      }, 2000);
+    };
+
+    const toggleMonitorCode = async () => {
+      const checkbox = document.getElementById('showMonitorCode');
+      const container = document.getElementById('monitorCodeContainer');
+      const codeTextarea = document.getElementById('monitorCode');
+      
+      if (checkbox.checked) {
+        container.style.display = 'block';
+        try {
+          const response = await fetch('monitor.html');
+          const htmlContent = await response.text();
+          codeTextarea.value = htmlContent;
+        } catch (error) {
+          codeTextarea.value = 'Error loading file: ' + error.message;
+        }
+      } else {
+        container.style.display = 'none';
+      }
+    };
+
+    const copyMonitorCode = () => {
+      const codeTextarea = document.getElementById('monitorCode');
+      codeTextarea.select();
+      document.execCommand('copy');
+      
+      const button = event.target;
+      const originalText = button.textContent;
+      button.textContent = '복사됨!';
+      button.style.background = '#28a745';
+      
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.style.background = '#007bff';
+      }, 2000);
+    };
+
+    const clearLog = () => {
+      document.getElementById('log').textContent = '';
+      const utterance = new SpeechSynthesisUtterance('메시지를 클리어 했습니다.');
+      window.speechSynthesis.speak(utterance);
+    };
+
+    const client = mqtt.connect('ws://pubcode2.iptime.org:39001', {
+      clientId: 'webClient_' + Math.random().toString(16).substr(2, 8)
+    });
+
+    client.on('connect', () => {
+      log('✅ WebSocket MQTT 연결됨');
+      client.subscribe('b03_test');
+      client.subscribe('b03_sensor');
+      document.getElementById('connectionStatus').className = 'status-indicator status-online';
+    });
+
+    client.on('message', (topic, message) => {
+      if (topic === 'b03_sensor') {
+        try {
+          const data = JSON.parse(message.toString());
+          if (data.temperature !== undefined) {
+            document.getElementById('temperature').textContent = `${data.temperature.toFixed(1)}°C`;
+          }
+          if (data.humidity !== undefined) {
+            document.getElementById('humidity').textContent = `${data.humidity.toFixed(1)}%`;
+          }
+          log(`🌡️ 센서 데이터: 온도 ${data.temperature}°C, 습도 ${data.humidity}%`);
+        } catch (error) {
+          log(`❌ 센서 데이터 파싱 오류: ${error.message}`);
+        }
+      } else {
+        log(`📩 수신됨: ${message.toString()}`);
+      }
+    });
+
+    client.on('error', () => {
+      document.getElementById('connectionStatus').className = 'status-indicator status-offline';
+    });
+
+    client.on('offline', () => {
+      document.getElementById('connectionStatus').className = 'status-indicator status-offline';
+    });
+
+    const sendText = (text) => {
+      client.publish('b03_test', text);
+      const deviceName = getDeviceName(text);
+      log(`📤 전송됨: ${deviceName}(${text})`);
+      if (text === 'ON') {
+        const utterance = new SpeechSynthesisUtterance('조명이 켜졌습니다.');
+        window.speechSynthesis.speak(utterance);
+      }
+      if (text === 'OFF') {
+        const utterance = new SpeechSynthesisUtterance('조명이 꺼졌습니다.');
+        window.speechSynthesis.speak(utterance);
+      }
+      if (text === 'PAN_ON') {
+        const utterance = new SpeechSynthesisUtterance('팬이 켜졌습니다.');
+        window.speechSynthesis.speak(utterance);
+      }
+      if (text === 'PAN_OFF') {
+        const utterance = new SpeechSynthesisUtterance('팬이 꺼졌습니다.');
+        window.speechSynthesis.speak(utterance);
+      }	  
+      if (text === 'DOOR_ON') {
+        const utterance = new SpeechSynthesisUtterance('문이 열렸습니다.');
+        window.speechSynthesis.speak(utterance);
+      }
+      if (text === 'DOOR_OFF') {
+        const utterance = new SpeechSynthesisUtterance('문이 닫혔습니다.');
+        window.speechSynthesis.speak(utterance);
+      }
+    };
+
+    const startVoiceRecognition = () => {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert('이 브라우저는 음성 인식을 지원하지 않습니다.');
+        return;
+      }
+
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = 'ko-KR';
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript.includes('조명 켜')) {
+          sendText('ON');
+        }
+        if (transcript.includes('조명 꺼')) {
+          sendText('OFF');
+        }
+		if (transcript.includes('팬 켜')) {
+          sendText('PAN_ON');
+        }
+        if (transcript.includes('팬 꺼')) {
+          sendText('PAN_OFF');
+        }
+		if (transcript.includes('문열어')) {
+          sendText('DOOR_ON');
+        }
+        if (transcript.includes('문닫아')) {
+          sendText('DOOR_OFF');
+        }
+      };
+      recognition.onerror = (event) => {
+        log('음성 인식 오류: ' + event.error);
+      };
+      recognition.start();
+    };
+  </script>
+</body>
+</html>
