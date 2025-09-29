@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스마트홈 모니터링 대시보드</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .status-bar {
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-online {
+            background: #28a745;
+        }
+        
+        .status-offline {
+            background: #dc3545;
+            animation: none;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+        
+        .devices-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .device-card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .device-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+        
+        .device-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .device-icon {
+            width: 80px;
+            height: 80px;
+            margin-right: 15px;
+            transition: transform 0.3s ease;
+        }
+        
+        .device-title {
+            flex: 1;
+        }
+        
+        .device-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .device-status {
+            font-size: 0.9rem;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        
+        .status-on {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-off {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .sensor-data {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        
+        .sensor-item {
+            text-align: center;
+            flex: 1;
+        }
+        
+        .sensor-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .sensor-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        
+        .log-panel {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .log-header {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .clear-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        
+        .clear-btn:hover {
+            background: #5a6268;
+        }
+        
+        .log-content {
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 10px;
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        
+        .device-icon.active {
+            transform: scale(1.1);
+        }
+        
+        .temperature-card {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+        }
+        
+        .humidity-card {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        }
+        
+        @media (max-width: 768px) {
+            .devices-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .device-icon {
+                width: 60px;
+                height: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>🏠 스마트홈 모니터링 대시보드</h1>
+            <p>실시간으로 모든 기기 상태와 센서 데이터를 모니터링합니다</p>
+        </div>
+        
+        <div class="status-bar">
+            <div class="connection-status">
+                <div id="connectionDot" class="status-dot status-offline"></div>
+                <span id="connectionText">MQTT 연결 중...</span>
+            </div>
+        </div>
+        
+        <div class="devices-grid">
+            <!-- 조명 제어 -->
+            <div class="device-card">
+                <div class="device-header">
+                    <svg class="device-icon" id="lightIcon" viewBox="0 0 100 100">
+                        <circle cx="50" cy="35" r="15" fill="#ffd700" stroke="#ffed4e" stroke-width="2"/>
+                        <path d="M50 5 L50 15 M50 55 L50 65 M25 35 L35 35 M65 35 L75 35 M32 18 L39 25 M61 25 L68 18 M32 52 L39 45 M61 45 L68 52" 
+                              stroke="#ffd700" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+                        <rect x="42" y="65" width="16" height="8" rx="2" fill="#666"/>
+                        <rect x="40" y="73" width="20" height="4" rx="2" fill="#444"/>
+                    </svg>
+                    <div class="device-title">
+                        <div class="device-name">조명</div>
+                        <div id="lightStatus" class="device-status status-off">꺼짐</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 환풍기 제어 -->
+            <div class="device-card">
+                <div class="device-header">
+                    <svg class="device-icon" id="fanIcon" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" fill="#e3f2fd" stroke="#2196f3" stroke-width="2"/>
+                        <circle cx="50" cy="50" r="8" fill="#2196f3"/>
+                        <path id="fanBlade1" d="M50 50 L50 20 A15 15 0 0 1 65 35 Z" fill="#42a5f5" transform-origin="50 50"/>
+                        <path id="fanBlade2" d="M50 50 L80 50 A15 15 0 0 1 65 65 Z" fill="#42a5f5" transform-origin="50 50"/>
+                        <path id="fanBlade3" d="M50 50 L50 80 A15 15 0 0 1 35 65 Z" fill="#42a5f5" transform-origin="50 50"/>
+                        <path id="fanBlade4" d="M50 50 L20 50 A15 15 0 0 1 35 35 Z" fill="#42a5f5" transform-origin="50 50"/>
+                    </svg>
+                    <div class="device-title">
+                        <div class="device-name">환풍기</div>
+                        <div id="fanStatus" class="device-status status-off">꺼짐</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 도어 제어 -->
+            <div class="device-card">
+                <div class="device-header">
+                    <svg class="device-icon" id="doorIcon" viewBox="0 0 100 100">
+                        <rect x="20" y="15" width="50" height="70" rx="3" fill="#8d6e63" stroke="#5d4037" stroke-width="2"/>
+                        <rect x="15" y="10" width="60" height="80" rx="5" fill="none" stroke="#424242" stroke-width="2" stroke-dasharray="2,2"/>
+                        <circle cx="60" cy="50" r="3" fill="#ffc107"/>
+                        <path id="doorPath" d="M70 15 L70 85" stroke="#666" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <div class="device-title">
+                        <div class="device-name">도어</div>
+                        <div id="doorStatus" class="device-status status-off">닫힘</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 온도 센서 -->
+            <div class="device-card temperature-card">
+                <div class="device-header">
+                    <svg class="device-icon" viewBox="0 0 100 100">
+                        <rect x="35" y="15" width="30" height="50" rx="15" fill="#ff5722" stroke="#d84315" stroke-width="2"/>
+                        <circle cx="50" cy="75" r="12" fill="#ff5722"/>
+                        <rect x="42" y="20" width="5" height="40" fill="#ffffff" opacity="0.7"/>
+                        <text x="50" y="45" text-anchor="middle" fill="white" font-size="8" font-weight="bold">°C</text>
+                    </svg>
+                    <div class="device-title">
+                        <div class="device-name">온도 센서</div>
+                        <div class="sensor-value" id="temperatureValue">--°C</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 습도 센서 -->
+            <div class="device-card humidity-card">
+                <div class="device-header">
+                    <svg class="device-icon" viewBox="0 0 100 100">
+                        <path d="M50 15 C30 35, 30 55, 50 75 C70 55, 70 35, 50 15 Z" fill="#2196f3" stroke="#1976d2" stroke-width="2"/>
+                        <circle cx="42" cy="45" r="3" fill="#ffffff" opacity="0.7"/>
+                        <circle cx="55" cy="55" r="2" fill="#ffffff" opacity="0.5"/>
+                        <text x="50" y="50" text-anchor="middle" fill="white" font-size="8" font-weight="bold">%</text>
+                    </svg>
+                    <div class="device-title">
+                        <div class="device-name">습도 센서</div>
+                        <div class="sensor-value" id="humidityValue">--%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="log-panel">
+            <div class="log-header">
+                📊 시스템 로그
+                <button class="clear-btn" onclick="clearLog()">로그 지우기</button>
+            </div>
+            <div class="log-content" id="logContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let deviceStates = {
+            light: false,
+            fan: false,
+            door: false
+        };
+        
+        const log = (message) => {
+            const now = new Date().toLocaleTimeString('ko-KR');
+            const logContent = document.getElementById('logContent');
+            logContent.textContent += `[${now}] ${message}\n`;
+            logContent.scrollTop = logContent.scrollHeight;
+        };
+        
+        const updateDeviceIcon = (device, isOn) => {
+            const icon = document.getElementById(`${device}Icon`);
+            if (isOn) {
+                icon.classList.add('active');
+            } else {
+                icon.classList.remove('active');
+            }
+        };
+        
+        const updateFanAnimation = (isOn) => {
+            const blades = ['fanBlade1', 'fanBlade2', 'fanBlade3', 'fanBlade4'];
+            blades.forEach(blade => {
+                const element = document.getElementById(blade);
+                if (isOn) {
+                    element.style.animation = 'spin 0.5s linear infinite';
+                } else {
+                    element.style.animation = 'none';
+                }
+            });
+        };
+        
+        const updateDoorPosition = (isOpen) => {
+            const doorPath = document.getElementById('doorPath');
+            if (isOpen) {
+                doorPath.setAttribute('d', 'M85 15 L85 85');
+            } else {
+                doorPath.setAttribute('d', 'M70 15 L70 85');
+            }
+        };
+        
+        const client = mqtt.connect('ws://pubcode2.iptime.org:39001', {
+            clientId: 'monitorClient_' + Math.random().toString(16).substr(2, 8)
+        });
+        
+        client.on('connect', () => {
+            log('✅ MQTT 브로커에 연결됨');
+            document.getElementById('connectionDot').className = 'status-dot status-online';
+            document.getElementById('connectionText').textContent = 'MQTT 연결됨';
+            
+            client.subscribe('b03_test');
+            client.subscribe('b03_sensor');
+            log('📡 토픽 구독 완료: b03_test, b03_sensor');
+        });
+        
+        client.on('message', (topic, message) => {
+            const msg = message.toString();
+            
+            if (topic === 'b03_test') {
+                log(`📩 제어 명령: ${msg}`);
+                
+                switch(msg) {
+                    case 'ON':
+                        deviceStates.light = true;
+                        document.getElementById('lightStatus').textContent = '켜짐';
+                        document.getElementById('lightStatus').className = 'device-status status-on';
+                        updateDeviceIcon('light', true);
+                        break;
+                    case 'OFF':
+                        deviceStates.light = false;
+                        document.getElementById('lightStatus').textContent = '꺼짐';
+                        document.getElementById('lightStatus').className = 'device-status status-off';
+                        updateDeviceIcon('light', false);
+                        break;
+                    case 'PAN_ON':
+                        deviceStates.fan = true;
+                        document.getElementById('fanStatus').textContent = '켜짐';
+                        document.getElementById('fanStatus').className = 'device-status status-on';
+                        updateDeviceIcon('fan', true);
+                        updateFanAnimation(true);
+                        break;
+                    case 'PAN_OFF':
+                        deviceStates.fan = false;
+                        document.getElementById('fanStatus').textContent = '꺼짐';
+                        document.getElementById('fanStatus').className = 'device-status status-off';
+                        updateDeviceIcon('fan', false);
+                        updateFanAnimation(false);
+                        break;
+                    case 'DOOR_ON':
+                        deviceStates.door = true;
+                        document.getElementById('doorStatus').textContent = '열림';
+                        document.getElementById('doorStatus').className = 'device-status status-on';
+                        updateDeviceIcon('door', true);
+                        updateDoorPosition(true);
+                        break;
+                    case 'DOOR_OFF':
+                        deviceStates.door = false;
+                        document.getElementById('doorStatus').textContent = '닫힘';
+                        document.getElementById('doorStatus').className = 'device-status status-off';
+                        updateDeviceIcon('door', false);
+                        updateDoorPosition(false);
+                        break;
+                }
+            } else if (topic === 'b03_sensor') {
+                try {
+                    const data = JSON.parse(msg);
+                    if (data.temperature !== undefined) {
+                        document.getElementById('temperatureValue').textContent = `${data.temperature.toFixed(1)}°C`;
+                    }
+                    if (data.humidity !== undefined) {
+                        document.getElementById('humidityValue').textContent = `${data.humidity.toFixed(1)}%`;
+                    }
+                    log(`🌡️ 센서 데이터 업데이트: ${data.temperature}°C, ${data.humidity}%`);
+                } catch (error) {
+                    log(`❌ 센서 데이터 파싱 오류: ${error.message}`);
+                }
+            }
+        });
+        
+        client.on('error', (error) => {
+            log(`❌ MQTT 연결 오류: ${error.message}`);
+            document.getElementById('connectionDot').className = 'status-dot status-offline';
+            document.getElementById('connectionText').textContent = 'MQTT 연결 오류';
+        });
+        
+        client.on('offline', () => {
+            log('⚠️ MQTT 연결 끊어짐');
+            document.getElementById('connectionDot').className = 'status-dot status-offline';
+            document.getElementById('connectionText').textContent = 'MQTT 연결 끊어짐';
+        });
+        
+        const clearLog = () => {
+            document.getElementById('logContent').textContent = '';
+            log('🧹 로그가 지워졌습니다');
+        };
+        
+        // CSS 애니메이션 추가
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // 초기 로그 메시지
+        log('🚀 스마트홈 모니터링 대시보드 시작됨');
+    </script>
+</body>
+</html>
